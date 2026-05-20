@@ -225,9 +225,15 @@ Repo layout:
 cmd/osrs-ge/          CLI entrypoint
 internal/osrsge/      focused internal package files for app, store, API client,
                       analysis probes, agent workbench, diagnostics, and server
-docs/                 design notes and agent-workbench docs
+docs/                 command, release, and agent-workbench docs
 .github/workflows/   CI
 ```
+
+Useful docs:
+
+- [Commands](docs/COMMANDS.md)
+- [Agent Workbench](docs/AGENT_WORKBENCH.md)
+- [Releasing](docs/RELEASING.md)
 
 ```bash
 go test ./...
