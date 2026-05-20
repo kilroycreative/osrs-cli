@@ -28,8 +28,8 @@ control gameplay.
 Requires Go 1.24 or newer.
 
 ```bash
-git clone https://github.com/YOUR_USER/osrs-ge.git
-cd osrs-ge
+git clone https://github.com/kilroycreative/osrs-cli.git
+cd osrs-cli
 go build -o osrs-ge ./cmd/osrs-ge
 ./osrs-ge version
 ```
@@ -203,4 +203,3 @@ caches should not be committed.
 ## License
 
 MIT. See [LICENSE](LICENSE).
-
