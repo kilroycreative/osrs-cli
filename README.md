@@ -191,6 +191,15 @@ prove your personal fills or guarantee future liquidity.
 
 ## Development
 
+Repo layout:
+
+```text
+cmd/osrs-ge/          CLI entrypoint
+internal/osrsge/      implementation, models, API client, store, analysis, server
+docs/                 design notes and agent-workbench docs
+.github/workflows/   CI
+```
+
 ```bash
 go test ./...
 go vet ./...

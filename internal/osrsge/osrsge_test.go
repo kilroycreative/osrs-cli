@@ -1,4 +1,4 @@
-package main
+package osrsge
 
 import (
 	"database/sql"
