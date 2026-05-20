@@ -30,7 +30,7 @@ control gameplay.
 Requires Go 1.24 or newer.
 
 ```bash
-git clone https://github.com/kilroycreative/pp-osrs-ge.git
+git clone https://github.com/kierandotai/pp-osrs-ge.git
 cd pp-osrs-ge
 go build -o osrs-ge ./cmd/osrs-ge
 ./osrs-ge version
@@ -45,7 +45,7 @@ go install ./cmd/osrs-ge
 Remote install:
 
 ```bash
-go install github.com/kilroycreative/pp-osrs-ge/cmd/osrs-ge@latest
+go install github.com/kierandotai/pp-osrs-ge/cmd/osrs-ge@latest
 ```
 
 The default SQLite cache is:

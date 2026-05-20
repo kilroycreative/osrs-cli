@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kilroycreative/pp-osrs-ge/internal/osrsge"
+	"github.com/kierandotai/pp-osrs-ge/internal/osrsge"
 )
 
 func main() {

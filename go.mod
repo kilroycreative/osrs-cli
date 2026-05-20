@@ -1,4 +1,4 @@
-module github.com/kilroycreative/pp-osrs-ge
+module github.com/kierandotai/pp-osrs-ge
 
 go 1.24.0
 
