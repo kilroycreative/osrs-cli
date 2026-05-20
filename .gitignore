@@ -1,0 +1,21 @@
+# Build artifacts
+/osrs-ge
+/dist/
+/build/
+
+# Local data
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+
+# Logs and temp files
+*.log
+/tmp/
+/.tmp/
+
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/
+
