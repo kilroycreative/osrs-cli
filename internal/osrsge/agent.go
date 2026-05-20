@@ -53,7 +53,7 @@ func (a *app) cmdAgentManifest(args []string) error {
 
 func buildAgentManifest() agentManifest {
 	return agentManifest{
-		Name:        "osrs-ge-agent-workbench",
+		Name:        "pp-osrs-ge-agent-workbench",
 		Version:     version,
 		GeneratedAt: time.Now().Format(time.RFC3339),
 		DataSources: []string{

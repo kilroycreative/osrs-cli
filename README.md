@@ -1,6 +1,7 @@
-# osrs-ge
+# pp-osrs-ge
 
-Local-first Old School RuneScape Grand Exchange research CLI.
+Local-first Old School RuneScape Grand Exchange research CLI from
+[Printing Press](https://printingpress.dev).
 
 `osrs-ge` is a read-only command-line tool for exploring OSRS Wiki price data:
 current margins, item metadata, price history, volume changes, watch rules,
@@ -29,8 +30,8 @@ control gameplay.
 Requires Go 1.24 or newer.
 
 ```bash
-git clone https://github.com/kilroycreative/osrs-cli.git
-cd osrs-cli
+git clone https://github.com/kilroycreative/pp-osrs-ge.git
+cd pp-osrs-ge
 go build -o osrs-ge ./cmd/osrs-ge
 ./osrs-ge version
 ```
@@ -39,6 +40,12 @@ Optional local install:
 
 ```bash
 go install ./cmd/osrs-ge
+```
+
+Remote install:
+
+```bash
+go install github.com/kilroycreative/pp-osrs-ge/cmd/osrs-ge@latest
 ```
 
 The default SQLite cache is:
@@ -70,6 +77,17 @@ export OSRS_GE_USER_AGENT="your-app-name/0.1 (+contact@example.com)"
 
 The tool caches bulk data locally where possible, but some commands fetch
 per-item time series. Use candidate limits and request delays responsibly.
+
+## Printing Press
+
+`pp-osrs-ge` is part of the Printing Press CLI family:
+
+```text
+https://printingpress.dev
+```
+
+The project follows the Printing Press pattern of small local-first CLIs with
+plain terminal output for humans and structured JSON output for agents.
 
 ## Quick Start
 

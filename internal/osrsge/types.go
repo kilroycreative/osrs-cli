@@ -10,7 +10,7 @@ import (
 const (
 	version               = "0.1.0"
 	apiBaseURL            = "https://prices.runescape.wiki/api/v1/osrs"
-	defaultUserAgentValue = "osrs-ge-cli/0.1 (+local research CLI; set OSRS_GE_USER_AGENT for contact)"
+	defaultUserAgentValue = "pp-osrs-ge/0.1 (+https://printingpress.dev; set OSRS_GE_USER_AGENT for contact)"
 )
 
 type app struct {
