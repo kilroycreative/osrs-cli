@@ -21,6 +21,7 @@ control gameplay.
 - Explore range/VWAP-bottom and dump/rebound research probes.
 - Use the experimental agent workbench to run multiple probes from one natural
   language research query.
+- Inspect the local cache schema and run setup/freshness diagnostics.
 - Serve a local read-only dashboard.
 
 ## Install
@@ -74,6 +75,7 @@ per-item time series. Use candidate limits and request delays responsibly.
 
 ```bash
 osrs-ge sync
+osrs-ge doctor
 osrs-ge search "abyssal"
 osrs-ge price "abyssal whip"
 osrs-ge opportunities --limit 25 --min-volume 500
@@ -123,7 +125,15 @@ osrs-ge watch check
 Use read-only SQL against the local cache:
 
 ```bash
+osrs-ge schema --json
 osrs-ge sql "select name, buy_limit from items where members = 0 order by buy_limit desc limit 20"
+```
+
+Check local readiness before a research run:
+
+```bash
+osrs-ge doctor
+osrs-ge doctor --json --no-api
 ```
 
 ## Research Probes
@@ -195,7 +205,8 @@ Repo layout:
 
 ```text
 cmd/osrs-ge/          CLI entrypoint
-internal/osrsge/      implementation, models, API client, store, analysis, server
+internal/osrsge/      focused internal package files for app, store, API client,
+                      analysis probes, agent workbench, diagnostics, and server
 docs/                 design notes and agent-workbench docs
 .github/workflows/   CI
 ```

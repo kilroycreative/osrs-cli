@@ -3,7 +3,9 @@ package osrsge
 import (
 	"database/sql"
 	"flag"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestGETax(t *testing.T) {
@@ -82,6 +84,99 @@ func TestBacktestSpread(t *testing.T) {
 	}
 }
 
+func TestSchemaReportIncludesCoreTables(t *testing.T) {
+	a, closeDB := testApp(t)
+	defer closeDB()
+
+	report, err := a.buildSchemaReport("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Tables) == 0 {
+		t.Fatal("expected schema tables")
+	}
+	if !schemaHasColumn(report, "items", "buy_limit") {
+		t.Fatalf("schema did not include items.buy_limit: %#v", report.Tables)
+	}
+}
+
+func TestDoctorReportNoAPIWarnsOnEmptyCache(t *testing.T) {
+	a, closeDB := testApp(t)
+	defer closeDB()
+
+	report, err := a.buildDoctorReport(false, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.APICheck.Checked {
+		t.Fatal("expected API check to be skipped")
+	}
+	if report.Counts["items"] != 0 {
+		t.Fatalf("items count = %d, want 0", report.Counts["items"])
+	}
+	if !warningsContain(report.Warnings, "item mapping cache is empty") {
+		t.Fatalf("expected empty-cache warning, got %#v", report.Warnings)
+	}
+}
+
+func TestDoctorReportDoesNotWarnOnCustomUserAgent(t *testing.T) {
+	a, closeDB := testApp(t)
+	defer closeDB()
+	a.userAgent = "osrs-ge-test/0.1 (+contact@example.com)"
+
+	report, err := a.buildDoctorReport(false, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.DefaultUserAgent {
+		t.Fatal("expected custom user agent to be detected")
+	}
+	if warningsContain(report.Warnings, "OSRS_GE_USER_AGENT") {
+		t.Fatalf("did not expect user-agent warning, got %#v", report.Warnings)
+	}
+}
+
 func validInt(v int64) sql.NullInt64 {
 	return sql.NullInt64{Int64: v, Valid: true}
+}
+
+func testApp(t *testing.T) (*app, func()) {
+	t.Helper()
+	path := t.TempDir() + "/test.sqlite"
+	db, err := openDB(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := &app{
+		dbPath:    path,
+		userAgent: defaultUserAgent(),
+		db:        db,
+		client: &wikiClient{
+			baseURL: apiBaseURL,
+		},
+	}
+	return a, func() { _ = db.Close() }
+}
+
+func schemaHasColumn(report schemaReport, tableName, columnName string) bool {
+	for _, table := range report.Tables {
+		if table.Name != tableName {
+			continue
+		}
+		for _, column := range table.Columns {
+			if column.Name == columnName {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func warningsContain(warnings []string, want string) bool {
+	for _, warning := range warnings {
+		if strings.Contains(warning, want) {
+			return true
+		}
+	}
+	return false
 }

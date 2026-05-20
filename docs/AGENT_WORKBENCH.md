@@ -37,6 +37,13 @@ Discover available probes:
 osrs-ge agent manifest --json
 ```
 
+Preflight the local data surface:
+
+```bash
+osrs-ge doctor --json
+osrs-ge schema --json
+```
+
 Run a deterministic multi-probe bundle:
 
 ```bash
@@ -61,6 +68,8 @@ The output includes:
   limit.
 - `movers`: short-term price and volume changes.
 - `sql`: read-only local cache inspection.
+- `schema`: table, column, row-count, and sync-state discovery.
+- `doctor`: cache freshness, API reachability, and setup warnings.
 
 Fixed scanners are probes, not the product boundary. The product boundary is:
 
@@ -82,4 +91,3 @@ The workbench is research-only.
 
 Use language such as "candidate", "setup", "evidence", "risk", "watch rule",
 and "manual review".
-
