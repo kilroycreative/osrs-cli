@@ -434,15 +434,61 @@ type opportunityRender struct {
 }
 
 func writeOpportunitiesTable(w io.Writer, opps []opportunity, render opportunityRender) error {
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "#\tITEM\tLOW\tHIGH\tTAX\tNET\tROI\tVOL\tBASE\tV/B\tLIMIT\tLIMIT PROFIT\tAGE\tSCORE")
-	for _, opp := range opps {
-		fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\t%.2f%%\t%s\t%s\t%.2fx\t%s\t%s\t%s\t%.1f\n",
-			opp.Rank, opp.Name, gp(opp.Low), gp(opp.High), gp(opp.Tax), gp(opp.NetMargin),
-			opp.ROI*100, gp(opp.Volume), baseline(opp.BaselineVolume), opp.VolumeRatio,
-			emptyZero(opp.BuyLimit), gp(opp.LimitProfit), durationSeconds(max(opp.HighAgeSeconds, opp.LowAgeSeconds)), opp.Score)
+	if len(opps) == 0 {
+		fmt.Fprintln(w, "No opportunities passed the filters.")
+		return nil
 	}
-	return tw.Flush()
+	if render.PreTax {
+		fmt.Fprintln(w, "[--pre-tax] margin, ROI, and break-even below exclude GE tax.")
+		fmt.Fprintln(w)
+	}
+	reachable := 0
+	for _, opp := range opps {
+		members := "free-to-play"
+		if opp.Members {
+			members = "members"
+		}
+		capStr, perLimitStr, perDayStr := "unknown (no buy limit)", "unknown (no buy limit)", "unknown (no buy limit)"
+		if opp.BuyLimit > 0 {
+			capStr = gp(opp.CapitalRequired) + " gp"
+			perLimitStr = gp(opp.GPPer4h) + " gp"
+			perDayStr = gp(opp.GPPerDayMax) + " gp"
+		}
+		fmt.Fprintf(w, "#%d  %s (id %d) - %s\n", opp.Rank, opp.Name, opp.ID, members)
+		fmt.Fprintf(w, "    low %s -> high %s    net %s gp    roi %.2f%%    vol %s (%.2fx base)    age %s\n",
+			gp(opp.Low), gp(opp.High), gp(opp.NetMargin), opp.ROI*100, gp(opp.Volume), opp.VolumeRatio,
+			durationSeconds(max(opp.HighAgeSeconds, opp.LowAgeSeconds)))
+		fmt.Fprintf(w, "    break-even sell %s gp    capital required %s    buy limit %s\n",
+			gp(opp.BreakEvenSell), capStr, emptyZero(opp.BuyLimit))
+		if opp.TaxDragPerUnit > 0 {
+			fmt.Fprintf(w, "    tax drag -%s/unit · -%s/limit\n", gp(opp.TaxDragPerUnit), gp(opp.TaxDragPerLimit))
+		} else {
+			fmt.Fprintln(w, "    tax drag none (exempt or 100 gp or below)")
+		}
+		fmt.Fprintf(w, "    gp/limit %s    gp/day(max) %s (theoretical)\n", perLimitStr, perDayStr)
+		fmt.Fprintf(w, "    score %.1f = trend %.2f × liq %.2f × scale %.2f\n",
+			opp.Score, opp.ScoreTrend, opp.ScoreLiquidity, opp.ScoreScale)
+		if opp.Invalidated {
+			fmt.Fprintf(w, "    INVALIDATED: %s\n", opp.InvalidationReason)
+		}
+		if render.Capital > 0 {
+			switch {
+			case opp.BuyLimit <= 0:
+				fmt.Fprintln(w, "    SCALE UNKNOWN: missing buy limit")
+			case opp.BelowScale:
+				fmt.Fprintf(w, "    BELOW SCALE: one window needs %s gp, capital is %s gp\n",
+					gp(opp.CapitalRequired), gp(render.Capital))
+			default:
+				reachable++
+			}
+		}
+		fmt.Fprintln(w)
+	}
+	if render.Capital > 0 {
+		fmt.Fprintf(w, "Reachable: %d/%d within %s gp capital.\n", reachable, len(opps), gp(render.Capital))
+	}
+	fmt.Fprintln(w, "gp/day(max) is a theoretical ceiling: 6 buy-limit windows per day, each fully bought and sold at current prices with no slippage.")
+	return nil
 }
 
 func writeOpportunitiesCSV(w io.Writer, opps []opportunity) error {

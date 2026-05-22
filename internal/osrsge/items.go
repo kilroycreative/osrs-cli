@@ -202,6 +202,7 @@ func (a *app) cmdPrice(args []string) error {
 		fmt.Fprintln(tw, "gp / day (theoretical max)\tunknown (missing buy limit)")
 	}
 	fmt.Fprintf(tw, "High/low age\t%s / %s\n", durationSeconds(opp.HighAgeSeconds), durationSeconds(opp.LowAgeSeconds))
+	fmt.Fprintf(tw, "Score\t%.1f  (trend %.2f × liq %.2f × scale %.2f)\n", opp.Score, opp.ScoreTrend, opp.ScoreLiquidity, opp.ScoreScale)
 	if opp.Invalidated {
 		fmt.Fprintf(tw, "Invalidated\tYES - %s\n", opp.InvalidationReason)
 	} else {

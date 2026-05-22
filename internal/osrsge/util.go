@@ -132,13 +132,6 @@ func gp(v int64) string {
 	return sign + s
 }
 
-func baseline(v float64) string {
-	if v <= 0 {
-		return "-"
-	}
-	return gp(int64(math.Round(v)))
-}
-
 func emptyZero(v int64) string {
 	if v == 0 {
 		return "-"
