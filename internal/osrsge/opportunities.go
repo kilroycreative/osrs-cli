@@ -24,7 +24,9 @@ func (a *app) oneOpportunity(id int64, taxRate float64, taxCap int64) (opportuni
 	}
 	for _, row := range rows {
 		if row.ID == id {
-			return computeOpportunity(row, 1, taxRate, taxCap, time.Now().Unix()), nil
+			opp := computeOpportunity(row, 1, taxRate, taxCap, time.Now().Unix())
+			opportunityScore(&opp, defaultScoreMinVolume, defaultScoreMaxAge)
+			return opp, nil
 		}
 	}
 	return opportunity{}, fmt.Errorf("no current price/volume row for item id %d", id)
@@ -202,7 +204,7 @@ func (a *app) collectOpportunities(f opportunityFilters) ([]opportunity, error) 
 		if f.AboveAverage && f.VolumeBaseline != "none" && opp.VolumeRatio < 1 {
 			continue
 		}
-		opp.Score = opportunityScore(opp, f.MinVolume, f.MaxAge)
+		opportunityScore(&opp, f.MinVolume, f.MaxAge)
 		opps = append(opps, opp)
 	}
 	sortOpportunities(opps, f.SortBy)
@@ -321,9 +323,18 @@ func computeOpportunity(row candidateRow, baseline float64, taxRate float64, tax
 	return opp
 }
 
-func opportunityScore(opp opportunity, minVolume int64, maxAge time.Duration) float64 {
+const (
+	defaultScoreMinVolume = 100
+	defaultScoreMaxAge    = 2 * time.Hour
+)
+
+// opportunityScore computes the ranking score for an opportunity and stores
+// it on opp together with its trend / liquidity / scale decomposition.
+// score = trend * liquidity * scale.
+func opportunityScore(opp *opportunity, minVolume int64, maxAge time.Duration) {
+	opp.Score, opp.ScoreTrend, opp.ScoreLiquidity, opp.ScoreScale = 0, 0, 0, 0
 	if opp.NetMargin <= 0 || opp.Low <= 0 {
-		return 0
+		return
 	}
 	volumeRatio := opp.VolumeRatio
 	if volumeRatio <= 0 {
@@ -336,7 +347,17 @@ func opportunityScore(opp opportunity, minVolume int64, maxAge time.Duration) fl
 	if maxAge > 0 {
 		freshness = math.Max(0, 1-(float64(freshAge)/float64(maxAge)))
 	}
-	return float64(opp.NetMargin) * math.Log10(float64(opp.Volume)+10) * math.Max(opp.ROI, 0.0001) * volBoost * liquidity * freshness
+	// trend: profit edge weighted by ROI and how fresh the prices are.
+	trend := float64(opp.NetMargin) * math.Max(opp.ROI, 0.0001) * freshness
+	// liquidity: traded depth and how far volume beats its baseline.
+	liq := math.Log10(float64(opp.Volume)+10) * volBoost * liquidity
+	// scale: capital the buy limit lets you deploy per refresh window.
+	// A missing buy limit yields zero here on purpose — never fabricated.
+	scale := math.Log1p(float64(opp.BuyLimit))
+	opp.ScoreTrend = trend
+	opp.ScoreLiquidity = liq
+	opp.ScoreScale = scale
+	opp.Score = trend * liq * scale
 }
 
 func sortOpportunities(opps []opportunity, sortBy string) {

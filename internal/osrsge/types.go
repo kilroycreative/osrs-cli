@@ -104,6 +104,9 @@ type opportunity struct {
 	HighAgeSeconds int64   `json:"high_age_seconds"`
 	LowAgeSeconds  int64   `json:"low_age_seconds"`
 	Score          float64 `json:"score"`
+	ScoreTrend     float64 `json:"score_trend"`
+	ScoreLiquidity float64 `json:"score_liquidity"`
+	ScoreScale     float64 `json:"score_scale"`
 }
 
 type watchRule struct {
