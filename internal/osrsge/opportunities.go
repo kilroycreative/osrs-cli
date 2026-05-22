@@ -272,6 +272,10 @@ func (a *app) cmdOpportunities(args []string) error {
 	return writeOpportunitiesTable(os.Stdout, opps)
 }
 
+// geWindowsPerDay is the number of 4-hour buy-limit windows in a day. It is
+// used only to derive the theoretical-maximum gp_per_day_max figure.
+const geWindowsPerDay = 6
+
 func computeOpportunity(row candidateRow, baseline float64, taxRate float64, taxCap int64, now int64) opportunity {
 	high := row.High.Int64
 	low := row.Low.Int64
@@ -317,8 +321,25 @@ func computeOpportunity(row candidateRow, baseline float64, taxRate float64, tax
 	if baseline > 0 {
 		opp.VolumeRatio = float64(volume) / baseline
 	}
+	opp.TaxDragPerUnit = tax
 	if limit > 0 {
 		opp.LimitProfit = net * limit
+		opp.TaxDragPerLimit = tax * limit
+		opp.CapitalRequired = limit * low
+	}
+	// gp_per_limit (LimitProfit) is one 4h buy-limit window of post-tax profit.
+	opp.GPPer4h = opp.LimitProfit
+	opp.GPPerDayMax = opp.LimitProfit * geWindowsPerDay
+	effectiveTaxRate := taxRate
+	if isTaxExempt(row.ID) {
+		effectiveTaxRate = 0
+	}
+	opp.BreakEvenSell = breakEvenSell(low, effectiveTaxRate)
+	if opp.BreakEvenSell > 0 && high < opp.BreakEvenSell {
+		opp.Invalidated = true
+		opp.InvalidationReason = fmt.Sprintf(
+			"sell zone %s gp is below break-even %s gp; the sale cannot recover the %s gp buy cost after tax",
+			gp(high), gp(opp.BreakEvenSell), gp(low))
 	}
 	return opp
 }
@@ -397,7 +418,14 @@ func writeOpportunitiesTable(w io.Writer, opps []opportunity) error {
 func writeOpportunitiesCSV(w io.Writer, opps []opportunity) error {
 	cw := csv.NewWriter(w)
 	defer cw.Flush()
-	if err := cw.Write([]string{"rank", "id", "name", "members", "low", "high", "tax", "net_margin", "roi", "volume", "baseline_volume", "volume_ratio", "buy_limit", "limit_profit", "high_age_seconds", "low_age_seconds", "score"}); err != nil {
+	if err := cw.Write([]string{
+		"rank", "id", "name", "members", "low", "high", "tax", "net_margin", "roi",
+		"volume", "baseline_volume", "volume_ratio", "buy_limit", "limit_profit",
+		"high_age_seconds", "low_age_seconds", "score", "score_trend",
+		"score_liquidity", "score_scale", "break_even_sell", "tax_drag_per_unit",
+		"tax_drag_per_limit", "capital_required", "gp_per_4h", "gp_per_day_max",
+		"invalidated", "invalidation_reason",
+	}); err != nil {
 		return err
 	}
 	for _, opp := range opps {
@@ -419,6 +447,17 @@ func writeOpportunitiesCSV(w io.Writer, opps []opportunity) error {
 			strconv.FormatInt(opp.HighAgeSeconds, 10),
 			strconv.FormatInt(opp.LowAgeSeconds, 10),
 			fmt.Sprintf("%.4f", opp.Score),
+			fmt.Sprintf("%.4f", opp.ScoreTrend),
+			fmt.Sprintf("%.4f", opp.ScoreLiquidity),
+			fmt.Sprintf("%.4f", opp.ScoreScale),
+			strconv.FormatInt(opp.BreakEvenSell, 10),
+			strconv.FormatInt(opp.TaxDragPerUnit, 10),
+			strconv.FormatInt(opp.TaxDragPerLimit, 10),
+			strconv.FormatInt(opp.CapitalRequired, 10),
+			strconv.FormatInt(opp.GPPer4h, 10),
+			strconv.FormatInt(opp.GPPerDayMax, 10),
+			strconv.FormatBool(opp.Invalidated),
+			opp.InvalidationReason,
 		}); err != nil {
 			return err
 		}

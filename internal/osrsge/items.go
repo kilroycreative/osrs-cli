@@ -165,7 +165,30 @@ func (a *app) cmdPrice(args []string) error {
 	fmt.Fprintf(tw, "ROI\t%.2f%%\n", opp.ROI*100)
 	fmt.Fprintf(tw, "1h volume\t%s\n", gp(opp.Volume))
 	fmt.Fprintf(tw, "Buy limit\t%s\n", emptyZero(opp.BuyLimit))
-	fmt.Fprintf(tw, "Limit profit\t%s gp\n", gp(opp.LimitProfit))
+	fmt.Fprintf(tw, "Break-even sell\t%s gp\n", gp(opp.BreakEvenSell))
+	if opp.TaxDragPerUnit > 0 {
+		fmt.Fprintf(tw, "Tax drag\t-%s gp/unit  -%s gp/limit\n", gp(opp.TaxDragPerUnit), gp(opp.TaxDragPerLimit))
+	} else {
+		fmt.Fprintln(tw, "Tax drag\tnone (exempt or 100 gp or below)")
+	}
+	if opp.BuyLimit > 0 {
+		fmt.Fprintf(tw, "Capital required\t%s gp\n", gp(opp.CapitalRequired))
+		fmt.Fprintf(tw, "gp / limit (4h window)\t%s gp\n", gp(opp.GPPer4h))
+		fmt.Fprintf(tw, "gp / day (theoretical max)\t%s gp\n", gp(opp.GPPerDayMax))
+	} else {
+		fmt.Fprintln(tw, "Capital required\tunknown (missing buy limit)")
+		fmt.Fprintln(tw, "gp / limit (4h window)\tunknown (missing buy limit)")
+		fmt.Fprintln(tw, "gp / day (theoretical max)\tunknown (missing buy limit)")
+	}
 	fmt.Fprintf(tw, "High/low age\t%s / %s\n", durationSeconds(opp.HighAgeSeconds), durationSeconds(opp.LowAgeSeconds))
-	return tw.Flush()
+	if opp.Invalidated {
+		fmt.Fprintf(tw, "Invalidated\tYES - %s\n", opp.InvalidationReason)
+	} else {
+		fmt.Fprintln(tw, "Invalidated\tno")
+	}
+	if err := tw.Flush(); err != nil {
+		return err
+	}
+	fmt.Fprintln(os.Stdout, "\ngp/day is a theoretical ceiling: 6 buy-limit windows per day, each fully bought and sold at current prices with no slippage.")
+	return nil
 }

@@ -53,3 +53,16 @@ func geTaxForItem(itemID, sellPrice int64, taxRate float64, taxCap int64) int64 
 	}
 	return geTax(sellPrice, taxRate, taxCap)
 }
+
+// breakEvenSell is the minimum sell price that recovers a buy at low after
+// paying GE tax: ceil(low / (1 - taxRate)). When taxRate is zero (pre-tax
+// mode or an exempt item) the break-even is simply the buy price.
+func breakEvenSell(low int64, taxRate float64) int64 {
+	if low <= 0 {
+		return 0
+	}
+	if taxRate <= 0 || taxRate >= 1 {
+		return low
+	}
+	return int64(math.Ceil(float64(low) / (1 - taxRate)))
+}

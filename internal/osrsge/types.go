@@ -107,6 +107,25 @@ type opportunity struct {
 	ScoreTrend     float64 `json:"score_trend"`
 	ScoreLiquidity float64 `json:"score_liquidity"`
 	ScoreScale     float64 `json:"score_scale"`
+	// BreakEvenSell is the minimum sell price that recovers the buy cost
+	// after GE tax: ceil(low / (1 - taxRate)). It is the sole invalidation
+	// level — high/low are live prices, not prescribed entry/exit levels.
+	BreakEvenSell   int64 `json:"break_even_sell"`
+	TaxDragPerUnit  int64 `json:"tax_drag_per_unit"`
+	TaxDragPerLimit int64 `json:"tax_drag_per_limit"`
+	// CapitalRequired is the gp needed to fill one buy-limit window at the
+	// low (buy-zone) price: buy_limit * low.
+	CapitalRequired int64 `json:"capital_required"`
+	// GPPer4h is the post-tax profit from one full buy-limit window. OSRS
+	// buy limits reset every 4 hours, so one limit == one 4h window.
+	GPPer4h int64 `json:"gp_per_4h"`
+	// GPPerDayMax is a THEORETICAL CEILING only: gp_per_4h times the six
+	// 4-hour windows in a day. It assumes every window is fully bought and
+	// fully sold at these prices with no slippage — rarely achievable.
+	GPPerDayMax int64 `json:"gp_per_day_max"`
+	// Invalidated is true when the live sell zone cannot clear break-even.
+	Invalidated        bool   `json:"invalidated"`
+	InvalidationReason string `json:"invalidation_reason,omitempty"`
 }
 
 type watchRule struct {
