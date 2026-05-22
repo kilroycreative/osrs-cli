@@ -3,6 +3,7 @@ package osrsge
 import (
 	"database/sql"
 	"flag"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -194,4 +195,142 @@ func warningsContain(warnings []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// withinTolerance reports whether got is within 1% of the hand-computed want.
+func withinTolerance(got, want float64) bool {
+	if want == 0 {
+		return math.Abs(got) < 1e-9
+	}
+	return math.Abs(got-want)/math.Abs(want) <= 0.01
+}
+
+// TestDataIntegrityReferenceValues locks the opportunity math against
+// hand-computed reference values for three representative items. Every CLI
+// figure flows from computeOpportunity, so asserting it here guards the
+// numbers the CLI prints. References assume the default 2% tax / 5M cap.
+func TestDataIntegrityReferenceValues(t *testing.T) {
+	const (
+		taxRate = 0.02
+		taxCap  = int64(5_000_000)
+	)
+	now := int64(1_700_000_000)
+
+	type fixture struct {
+		name             string
+		id               int64
+		low, high        int64
+		buyLimit         int64
+		volume           int64
+		wantTax          int64   // floor(high * 0.02)
+		wantNetMargin    int64   // high - low - tax
+		wantROI          float64 // net / low
+		wantBreakEven    int64   // ceil(low / 0.98)
+		wantTaxDragLimit int64   // tax * buy limit
+		wantCapital      int64   // buy limit * low
+		wantGPPerLimit   int64   // net * buy limit
+		wantGPPerDayMax  int64   // gp/limit * 6
+		wantInvalidated  bool    // high < break-even
+	}
+
+	fixtures := []fixture{
+		{
+			// Dragon bones: tax floor(2520*.02)=50, net 120-50=70,
+			// roi 70/2400, break-even ceil(2400/.98)=2449.
+			name: "Dragon bones", id: 536, low: 2400, high: 2520,
+			buyLimit: 7500, volume: 1_200_000,
+			wantTax: 50, wantNetMargin: 70, wantROI: 70.0 / 2400.0,
+			wantBreakEven: 2449, wantTaxDragLimit: 375_000,
+			wantCapital: 18_000_000, wantGPPerLimit: 525_000,
+			wantGPPerDayMax: 3_150_000, wantInvalidated: false,
+		},
+		{
+			// Nature rune: tax floor(105*.02)=2, net 10-2=8,
+			// roi 8/95, break-even ceil(95/.98)=97.
+			name: "Nature rune", id: 561, low: 95, high: 105,
+			buyLimit: 25_000, volume: 4_000_000,
+			wantTax: 2, wantNetMargin: 8, wantROI: 8.0 / 95.0,
+			wantBreakEven: 97, wantTaxDragLimit: 50_000,
+			wantCapital: 2_375_000, wantGPPerLimit: 200_000,
+			wantGPPerDayMax: 1_200_000, wantInvalidated: false,
+		},
+		{
+			// Magic logs: tax floor(1100*.02)=22, net 100-22=78,
+			// roi 78/1000, break-even ceil(1000/.98)=1021.
+			name: "Magic logs", id: 384, low: 1000, high: 1100,
+			buyLimit: 15_000, volume: 900_000,
+			wantTax: 22, wantNetMargin: 78, wantROI: 78.0 / 1000.0,
+			wantBreakEven: 1021, wantTaxDragLimit: 330_000,
+			wantCapital: 15_000_000, wantGPPerLimit: 1_170_000,
+			wantGPPerDayMax: 7_020_000, wantInvalidated: false,
+		},
+		{
+			// Magic logs at a sell zone below break-even: tax
+			// floor(1010*.02)=20, net 10-20=-10, invalidated.
+			name: "Magic logs (invalidated)", id: 384, low: 1000, high: 1010,
+			buyLimit: 15_000, volume: 900_000,
+			wantTax: 20, wantNetMargin: -10, wantROI: -10.0 / 1000.0,
+			wantBreakEven: 1021, wantTaxDragLimit: 300_000,
+			wantCapital: 15_000_000, wantGPPerLimit: -150_000,
+			wantGPPerDayMax: -900_000, wantInvalidated: true,
+		},
+	}
+
+	for _, f := range fixtures {
+		t.Run(f.name, func(t *testing.T) {
+			row := candidateRow{
+				ID:         f.id,
+				Name:       f.name,
+				BuyLimit:   validInt(f.buyLimit),
+				High:       validInt(f.high),
+				HighTime:   validInt(now),
+				Low:        validInt(f.low),
+				LowTime:    validInt(now),
+				HighVolume: f.volume,
+				Timestamp:  now,
+			}
+			opp := computeOpportunity(row, 1, taxRate, taxCap, now)
+
+			checks := []struct {
+				field     string
+				got, want float64
+			}{
+				{"tax", float64(opp.Tax), float64(f.wantTax)},
+				{"net_margin", float64(opp.NetMargin), float64(f.wantNetMargin)},
+				{"roi", opp.ROI, f.wantROI},
+				{"break_even_sell", float64(opp.BreakEvenSell), float64(f.wantBreakEven)},
+				{"tax_drag_per_unit", float64(opp.TaxDragPerUnit), float64(f.wantTax)},
+				{"tax_drag_per_limit", float64(opp.TaxDragPerLimit), float64(f.wantTaxDragLimit)},
+				{"capital_required", float64(opp.CapitalRequired), float64(f.wantCapital)},
+				{"gp_per_limit", float64(opp.LimitProfit), float64(f.wantGPPerLimit)},
+				{"gp_per_4h", float64(opp.GPPer4h), float64(f.wantGPPerLimit)},
+				{"gp_per_day_max", float64(opp.GPPerDayMax), float64(f.wantGPPerDayMax)},
+			}
+			for _, c := range checks {
+				if !withinTolerance(c.got, c.want) {
+					t.Errorf("%s = %v, want %v (outside 1%% tolerance)", c.field, c.got, c.want)
+				}
+			}
+			if opp.Invalidated != f.wantInvalidated {
+				t.Errorf("invalidated = %v, want %v", opp.Invalidated, f.wantInvalidated)
+			}
+		})
+	}
+}
+
+// TestScoreDecompositionMultipliesToScore verifies the score equals the
+// product of its trend / liquidity / scale components.
+func TestScoreDecompositionMultipliesToScore(t *testing.T) {
+	opp := opportunity{
+		Name: "Dragon bones", NetMargin: 70, Low: 2400, High: 2520,
+		Volume: 1_200_000, BuyLimit: 7500, ROI: 70.0 / 2400.0, VolumeRatio: 1.8,
+	}
+	opportunityScore(&opp, 100, 2*time.Hour)
+	if opp.ScoreTrend <= 0 || opp.ScoreLiquidity <= 0 || opp.ScoreScale <= 0 {
+		t.Fatalf("decomposition components must be positive: %#v", opp)
+	}
+	product := opp.ScoreTrend * opp.ScoreLiquidity * opp.ScoreScale
+	if !withinTolerance(opp.Score, product) {
+		t.Fatalf("score = %v, trend*liq*scale = %v", opp.Score, product)
+	}
 }
