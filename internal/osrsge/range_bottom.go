@@ -194,8 +194,8 @@ func analyzeRangeBottomCandidate(candidate patternCandidate, points []timeseries
 	targetVWAP := int64(math.Round(vwap))
 	targetTop := int64(math.Round(rangeHigh))
 	currentGP := int64(math.Round(current))
-	netToVWAP := targetVWAP - currentGP - geTax(targetVWAP, opts.TaxRate, opts.TaxCap)
-	netToTop := targetTop - currentGP - geTax(targetTop, opts.TaxRate, opts.TaxCap)
+	netToVWAP := targetVWAP - currentGP - geTaxForItem(candidate.Item.ID, targetVWAP, opts.TaxRate, opts.TaxCap)
+	netToTop := targetTop - currentGP - geTaxForItem(candidate.Item.ID, targetTop, opts.TaxRate, opts.TaxCap)
 	if netToVWAP <= 0 {
 		return rangeBottomHit{}, false
 	}

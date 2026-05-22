@@ -274,7 +274,7 @@ func computeOpportunity(row candidateRow, baseline float64, taxRate float64, tax
 	high := row.High.Int64
 	low := row.Low.Int64
 	volume := row.HighVolume + row.LowVolume
-	tax := geTax(high, taxRate, taxCap)
+	tax := geTaxForItem(row.ID, high, taxRate, taxCap)
 	net := high - low - tax
 	gross := high - low
 	limit := int64(0)
@@ -319,17 +319,6 @@ func computeOpportunity(row candidateRow, baseline float64, taxRate float64, tax
 		opp.LimitProfit = net * limit
 	}
 	return opp
-}
-
-func geTax(sellPrice int64, taxRate float64, taxCap int64) int64 {
-	if sellPrice <= 0 || taxRate <= 0 {
-		return 0
-	}
-	tax := int64(math.Floor(float64(sellPrice) * taxRate))
-	if taxCap > 0 && tax > taxCap {
-		return taxCap
-	}
-	return tax
 }
 
 func opportunityScore(opp opportunity, minVolume int64, maxAge time.Duration) float64 {

@@ -14,9 +14,13 @@ func TestGETax(t *testing.T) {
 		sell int64
 		want int64
 	}{
-		{name: "below one coin rounds to zero", sell: 49, want: 0},
+		{name: "100 gp threshold is untaxed", sell: 100, want: 0},
+		{name: "101 gp clears threshold and floors", sell: 101, want: 2},
 		{name: "two percent floors", sell: 199, want: 3},
-		{name: "cap", sell: 1_000_000_000, want: 5_000_000},
+		{name: "just below cap", sell: 4_999_999, want: 99_999},
+		{name: "exactly cap input", sell: 5_000_000, want: 100_000},
+		{name: "cap clamps large sale", sell: 250_000_001, want: 5_000_000},
+		{name: "billion clamps to cap", sell: 1_000_000_000, want: 5_000_000},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -24,6 +28,17 @@ func TestGETax(t *testing.T) {
 				t.Fatalf("geTax(%d) = %d, want %d", tt.sell, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestGETaxForItemExempt(t *testing.T) {
+	// Old school bond (id 13190) is on the exempt list: never taxed.
+	if got := geTaxForItem(13190, 8_000_000, 0.02, 5_000_000); got != 0 {
+		t.Fatalf("geTaxForItem(bond) = %d, want 0", got)
+	}
+	// A non-exempt item is taxed normally.
+	if got := geTaxForItem(2, 8_000_000, 0.02, 5_000_000); got != 160_000 {
+		t.Fatalf("geTaxForItem(non-exempt) = %d, want 160000", got)
 	}
 }
 

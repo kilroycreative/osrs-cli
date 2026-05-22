@@ -245,7 +245,7 @@ func analyzePatternCandidate(candidate patternCandidate, points []timeseriesPoin
 			if ratio < opts.MinRatio || ratio > opts.MaxRatio {
 				continue
 			}
-			tax := geTax(high, opts.TaxRate, opts.TaxCap)
+			tax := geTaxForItem(candidate.Item.ID, high, opts.TaxRate, opts.TaxCap)
 			net := high - low - tax
 			if net < opts.MinNetMargin {
 				continue
