@@ -1,0 +1,11 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "crons": [
+    {
+      "path": "/api/cron/strategy-drop",
+      "schedule": "0 */6 * * *"
+    }
+  ]
+}
