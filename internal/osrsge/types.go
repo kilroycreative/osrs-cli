@@ -126,6 +126,9 @@ type opportunity struct {
 	// Invalidated is true when the live sell zone cannot clear break-even.
 	Invalidated        bool   `json:"invalidated"`
 	InvalidationReason string `json:"invalidation_reason,omitempty"`
+	// BelowScale is set only when --capital is supplied: true when filling
+	// one buy-limit window costs more than the available capital.
+	BelowScale bool `json:"below_scale,omitempty"`
 }
 
 type watchRule struct {

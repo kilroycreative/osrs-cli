@@ -62,6 +62,7 @@ type opportunityFilters struct {
 	MaxSpreadPct   float64
 	TaxRate        float64
 	TaxCap         int64
+	Capital        int64
 	NoSync         bool
 }
 
@@ -213,6 +214,9 @@ func (a *app) collectOpportunities(f opportunityFilters) ([]opportunity, error) 
 	}
 	for i := range opps {
 		opps[i].Rank = i + 1
+		if f.Capital > 0 && opps[i].CapitalRequired > 0 {
+			opps[i].BelowScale = opps[i].CapitalRequired > f.Capital
+		}
 	}
 	return opps, nil
 }
@@ -233,6 +237,9 @@ func (a *app) cmdOpportunities(args []string) error {
 	maxSpreadPct := fs.Float64("max-spread-pct", 0.50, "reject extreme gross spread percentage; 0 disables")
 	taxRate := fs.Float64("tax-rate", 0.02, "GE tax rate")
 	taxCap := fs.Int64("tax-cap", 5_000_000, "GE tax cap per item")
+	capitalText := fs.String("capital", "", "available capital, e.g. 20m; items needing more to fill a window are flagged below-scale")
+	preTax := fs.Bool("pre-tax", false, "skip GE tax in margin/ROI calculations")
+	explain := fs.Bool("explain", false, "print raw inputs and the full computation for each item")
 	jsonOut := fs.Bool("json", false, "emit JSON")
 	csvOut := fs.Bool("csv", false, "emit CSV")
 	noSync := fs.Bool("no-sync", false, "do not refresh latest/interval cache")
@@ -240,9 +247,21 @@ func (a *app) cmdOpportunities(args []string) error {
 		"limit": true, "interval": true, "min-volume": true, "min-margin": true,
 		"min-roi": true, "volume-baseline": true, "members": true, "sort": true,
 		"max-age": true, "max-spread-pct": true, "tax-rate": true, "tax-cap": true,
+		"capital": true,
 	})
 	if err != nil {
 		return err
+	}
+	effectiveTaxRate := *taxRate
+	if *preTax {
+		effectiveTaxRate = 0
+	}
+	capital := int64(0)
+	if strings.TrimSpace(*capitalText) != "" {
+		capital, err = parseGP(*capitalText)
+		if err != nil {
+			return fmt.Errorf("--capital: %w", err)
+		}
 	}
 	opps, err := a.collectOpportunities(opportunityFilters{
 		Interval:       *interval,
@@ -256,8 +275,9 @@ func (a *app) cmdOpportunities(args []string) error {
 		SortBy:         *sortBy,
 		MaxAge:         *maxAge,
 		MaxSpreadPct:   *maxSpreadPct,
-		TaxRate:        *taxRate,
+		TaxRate:        effectiveTaxRate,
 		TaxCap:         *taxCap,
+		Capital:        capital,
 		NoSync:         *noSync,
 	})
 	if err != nil {
@@ -269,7 +289,11 @@ func (a *app) cmdOpportunities(args []string) error {
 	if *csvOut {
 		return writeOpportunitiesCSV(os.Stdout, opps)
 	}
-	return writeOpportunitiesTable(os.Stdout, opps)
+	if *explain {
+		explainOpportunities(os.Stdout, opps, effectiveTaxRate, *taxCap, capital)
+		return nil
+	}
+	return writeOpportunitiesTable(os.Stdout, opps, opportunityRender{Capital: capital, PreTax: *preTax})
 }
 
 // geWindowsPerDay is the number of 4-hour buy-limit windows in a day. It is
@@ -403,7 +427,13 @@ func sortOpportunities(opps []opportunity, sortBy string) {
 	})
 }
 
-func writeOpportunitiesTable(w io.Writer, opps []opportunity) error {
+// opportunityRender carries flag-driven context into the table renderer.
+type opportunityRender struct {
+	Capital int64
+	PreTax  bool
+}
+
+func writeOpportunitiesTable(w io.Writer, opps []opportunity, render opportunityRender) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "#\tITEM\tLOW\tHIGH\tTAX\tNET\tROI\tVOL\tBASE\tV/B\tLIMIT\tLIMIT PROFIT\tAGE\tSCORE")
 	for _, opp := range opps {

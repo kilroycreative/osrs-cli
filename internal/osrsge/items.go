@@ -130,9 +130,23 @@ func (a *app) cmdPrice(args []string) error {
 	noSync := fs.Bool("no-sync", false, "do not refresh latest/1h cache")
 	taxRate := fs.Float64("tax-rate", 0.02, "GE tax rate")
 	taxCap := fs.Int64("tax-cap", 5_000_000, "GE tax cap per item")
-	positionals, err := parseCommandFlags(fs, args, map[string]bool{"tax-rate": true, "tax-cap": true})
+	capitalText := fs.String("capital", "", "available capital, e.g. 20m; flags the item below-scale if a window costs more")
+	preTax := fs.Bool("pre-tax", false, "skip GE tax in margin/ROI calculations")
+	explain := fs.Bool("explain", false, "print raw inputs and the full computation")
+	positionals, err := parseCommandFlags(fs, args, map[string]bool{"tax-rate": true, "tax-cap": true, "capital": true})
 	if err != nil {
 		return err
+	}
+	effectiveTaxRate := *taxRate
+	if *preTax {
+		effectiveTaxRate = 0
+	}
+	capital := int64(0)
+	if strings.TrimSpace(*capitalText) != "" {
+		capital, err = parseGP(*capitalText)
+		if err != nil {
+			return fmt.Errorf("--capital: %w", err)
+		}
 	}
 	input := strings.TrimSpace(strings.Join(positionals, " "))
 	if input == "" {
@@ -148,9 +162,16 @@ func (a *app) cmdPrice(args []string) error {
 	if err != nil {
 		return err
 	}
-	opp, err := a.oneOpportunity(item.ID, *taxRate, *taxCap)
+	opp, err := a.oneOpportunity(item.ID, effectiveTaxRate, *taxCap)
 	if err != nil {
 		return err
+	}
+	if capital > 0 && opp.CapitalRequired > 0 {
+		opp.BelowScale = opp.CapitalRequired > capital
+	}
+	if *explain {
+		explainOpportunity(os.Stdout, opp, effectiveTaxRate, *taxCap, capital)
+		return nil
 	}
 	if *jsonOut {
 		return json.NewEncoder(os.Stdout).Encode(opp)
@@ -186,8 +207,21 @@ func (a *app) cmdPrice(args []string) error {
 	} else {
 		fmt.Fprintln(tw, "Invalidated\tno")
 	}
+	if capital > 0 {
+		switch {
+		case opp.BuyLimit <= 0:
+			fmt.Fprintln(tw, "Within capital\tunknown (missing buy limit)")
+		case opp.BelowScale:
+			fmt.Fprintf(tw, "Within capital\tNO - one window needs %s gp, have %s gp (below scale)\n", gp(opp.CapitalRequired), gp(capital))
+		default:
+			fmt.Fprintf(tw, "Within capital\tyes - one window needs %s gp of %s gp\n", gp(opp.CapitalRequired), gp(capital))
+		}
+	}
 	if err := tw.Flush(); err != nil {
 		return err
+	}
+	if *preTax {
+		fmt.Fprintln(os.Stdout, "\n--pre-tax: margins and ROI above exclude GE tax.")
 	}
 	fmt.Fprintln(os.Stdout, "\ngp/day is a theoretical ceiling: 6 buy-limit windows per day, each fully bought and sold at current prices with no slippage.")
 	return nil
