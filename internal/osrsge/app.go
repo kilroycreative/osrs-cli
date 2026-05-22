@@ -88,6 +88,8 @@ parsedGlobalPrefix:
 		return a.withDB(func() error { return a.cmdPatterns(cmdArgs) })
 	case "range-bottom", "bottoms", "vwap-bottom":
 		return a.withDB(func() error { return a.cmdRangeBottom(cmdArgs) })
+	case "presets", "strategies":
+		return a.cmdPresets(cmdArgs)
 	case "agent", "workbench", "research":
 		return a.cmdAgent(cmdArgs)
 	case "serve", "dashboard":
@@ -134,6 +136,7 @@ Commands:
   patterns         Find dump/rebound patterns similar to cheap high-limit flips
   shocks           Alias for patterns
   range-bottom     Find items near the bottom of their own range/VWAP
+  presets          Named strategy library with prompts and command shapes
   agent            Agent workbench manifest and flexible multi-probe runs
   serve            Run a local read-only dashboard
   watch            Add/list/remove/check local watch rules
@@ -153,6 +156,8 @@ Examples:
   osrs-ge allocate --cash 20m --limit 8 --min-volume 1000
   osrs-ge patterns --like "bronze knife" --cash 40m --limit 15
   osrs-ge range-bottom --cash 40m --days 90 --step 6h
+  osrs-ge presets --category process
+  osrs-ge presets "dragon bones ladder"
   osrs-ge agent run "items at the bottom of VWAP with consistent volume" --json
   osrs-ge serve --addr 127.0.0.1:8765
   osrs-ge watch add "blood rune" --below 280 --min-volume 100000
